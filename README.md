@@ -1,1 +1,1 @@
-# SpotiFest
+# spot_a_fest
