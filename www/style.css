@@ -37,23 +37,15 @@ html {
     display:none !important;
 }
 
-#dates > div > input:nth-child(1),
-#dates > div > input:nth-child(3) {
-    width: 40%;
-    font-size: 18px;
-}
 
-#dates > div {
-    font-size: 18px;
-}
-
-#shiny-material-dropdown-country_select > label, #dates > label {
+#shiny-material-dropdown-country_select > label, #shiny-material-dropdown-dates > label {
     color:black;
     font-size: 20px;
     font-weight: bold;
 }
 
-#shiny-material-dropdown-country_select > div > input {
+#shiny-material-dropdown-country_select > div > input,
+#shiny-material-dropdown-dates > div > input{
     padding-top: 10px;
     font-size: 18px;
 }

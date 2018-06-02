@@ -12,11 +12,11 @@ plan(multiprocess)
 
 rm(list = ls())
 
-load('festivals_2.RData')
+load('festival_details.RData')
 load('festival_artists_spotify_2.RData')
 
 # festivals <- filter(festivals, festival_start >= Sys.Date())
-festivals <- filter(festivals, festival_dates != 'Cancelled')
+festival_details <- filter(festival_details, festival_dates != 'Cancelled')
 
 if (interactive()) {
     # testing url
@@ -61,28 +61,21 @@ ui <- material_page(
     ),
     tags$head(tags$link(rel = 'stylesheet', type = 'text/css', href = 'style.css')),
     material_row(id = 'second_row',
-                 material_column(width = 3, 
+                 material_column(width = 3,
                                  material_card(
-                                     material_dropdown('country_select', 'Country', c('All', sort(unique(festivals$country))), color = 'black'),
-                                     dateRangeInput('dates', 'Dates', Sys.Date(), max(festivals$festival_start), width = '100%'),
-                                     p('Festivals are ranked by a "Lineup Score," which takes into account your top artists...', style = 'font-size:20px; font-weight:bold;'),
-                                     dataTableOutput('top_artists_table'),
-                                     br(),
-                                     p('...and similar artists', style = 'font-size:20px; font-weight:bold;'),
-                                     dataTableOutput('related_artists_table'),
-                                     br(),
-                                     p('Festival data from ', 
+                                     material_dropdown('country_select', 'Where', c('Anywhere', sort(unique(festival_details$country))), color = 'black'),
+                                     material_dropdown('dates', 'When', c('Next 12 months' = as.character(Sys.Date() + years(1)), 'Next 6 months' = as.character(Sys.Date() + months(6))), color = 'black'),
+                                     p('Festival data from ',
                                        a('Music Festival Wizard', href = 'https://www.musicfestivalwizard.com', target = '_blank')
                                      ),
-                                     p('Artist data from ', 
-                                       a('Spotify', href = 'https://beta.developer.spotify.com/documentation/web-api/', target = '_blank'), 
-                                       ' pulled with ', 
+                                     p('Artist data from ',
+                                       a('Spotify', href = 'https://beta.developer.spotify.com/documentation/web-api/', target = '_blank'),
+                                       ' pulled with ',
                                        a('spotifyr', href = 'https://www.github.com/charlie86/spotifyr', target = '_blank')
-                                     ),
-                                     helpText('Note: artists who appear in both top and similar artists will have their all their scores added together')
+                                     )
                                  )
                  ),
-                 material_column(width = 9, 
+                 material_column(width = 9,
                                  withSpinner(uiOutput('festivals_tbl'), color = '#1ED760', type = 7, proxy.height = '1000px', size = 2)
                  )
     )
@@ -106,7 +99,7 @@ server <- function(input, output, session) {
                    query = list(limit = 50), 
                    add_headers(.headers = c('Authorization' = paste0('Bearer ', get_access_token())))
         ) %>% content %>% .$items
-
+        
         map_df(res, function(x) {
             list(
                 artist_name = x$name,
@@ -114,7 +107,7 @@ server <- function(input, output, session) {
             )
         })
     })
-
+    
     output$top_artists_table <- renderDataTable({
         req(nrow(get_degrees()) > 0)
         get_degrees() %>% 
@@ -158,29 +151,29 @@ server <- function(input, output, session) {
         req(nrow(get_degrees()) > 0)
         num_festivals <- 100
         
-        festivals_filtered <- unique(festivals)
+        festivals_filtered <- unique(festival_details)
         
-        if (input$country_select != 'All') {
+        if (input$country_select != 'Anywhere') {
             festivals_filtered <- filter(festivals_filtered, country == input$country_select)
         }
-
+        
         lineup_affinities <- festivals_filtered %>%
             unique %>% 
-            filter(festival_start >= input$dates[1], festival_start <= input$dates[2]) %>% 
-            left_join(select(festival_artists_spotify, -artist_name), by = c('festival_title' = 'festival_name')) %>% 
+            filter(festival_start <= input$dates) %>% 
+            left_join(select(festival_artists_spotify, -c(artist_name, festival_url, festival_poster)), by = c('festival_title' = 'festival_name')) %>% 
             inner_join(get_degrees(), by = c('spotify_artist_uri' = 'artist_uri'))
         
         festival_info <- lineup_affinities %>%
             filter(festival_start >= Sys.Date()) %>% 
             mutate(festival_url = ifelse(!is.na(festival_url), festival_url, festival_mfw_url),
                    festival_location = ifelse(country == 'United States', str_glue('{festival_location}, USA'), festival_location)) %>% 
-            group_by(festival_title, festival_start, festival_location, festival_url, festival_dates, festival_image) %>%
+            group_by(festival_title, festival_start, festival_location, festival_url, festival_dates, festival_img_big, festival_poster) %>%
             summarise(lineup_score = round(sum(score), 2)) %>%
             ungroup %>%
             arrange(-lineup_score) %>%
             slice(1:num_festivals)
         
-        festival_top_artists <<- festival_info %>% 
+        festival_top_artists <- festival_info %>% 
             mutate(festival_rank = row_number()) %>% 
             left_join(lineup_affinities, by = 'festival_title') %>% 
             select(festival_title, festival_rank, spotify_artist_name, spotify_artist_img, degree, rank, score) %>% 
@@ -192,45 +185,40 @@ server <- function(input, output, session) {
             ungroup
         
         if (nrow(festival_info) > 0) {
-            layout_matrix <- map(1:(num_festivals/4), function(x) ((x*4)-3):(x*4))
+            layout_matrix <- map(1:(num_festivals), function(x) x)
             material_column(width = 12,
                             map(1:length(layout_matrix), function(this_row) {
                                 material_row(
                                     map(layout_matrix[[this_row]], function(this_festival) {
                                         if (!is.na(festival_info$festival_title[this_festival])) {
-                                            material_column(width = 3, align = 'center',
-                                                            material_card(
-                                                                h4(gsub(' 2018| Festival| Music Festival', '', festival_info$festival_title[this_festival])),
-                                                                p(
-                                                                    img(src=festival_info$festival_image[this_festival], align='center'), 
-                                                                    br(),
-                                                                    festival_info$festival_dates[this_festival], 
-                                                                    br(), 
-                                                                    festival_info$festival_location[this_festival],
-                                                                    br(),
-                                                                    HTML(str_glue('
-                                                            <button id="go_to_website{this_row}{this_festival}" type="button" class="btn btn-default action-button mdc-button" style="display:inline-block" onclick="window.open(\'{festival_info$festival_url[this_festival]}\', \'_blank\')">
-                                                                <i class="material-icons mdc-button__icon">launch</i>
-                                                                Website
-                                                            </button>'))
-                                                                ),
-                                                                h5('Lineup Score: ', span(festival_info$lineup_score[this_festival], style = 'background-color: #2ebd59; color:white; padding-left:5px; padding-right:5px;')),
-                                                                map(1:nrow(festival_top_artists %>% filter(festival_rank == this_festival)), function(this_artist) {
-                                                                    top_artist_df <- festival_top_artists %>% 
-                                                                        filter(festival_rank == this_festival) %>% 
-                                                                        slice(this_artist)
-                                                                    tagList(
-                                                                        div(class = 'tooltip',
-                                                                            p(top_artist_df$spotify_artist_name,
-                                                                              span(class = 'tooltiptext', style = 'padding-right:10px;padding-left:10px',
-                                                                                   str_glue('+ {round(top_artist_df$score, 2)}')
-                                                                              )
+                                            material_column(width = 12, align = 'center',
+                                                            
+                                                            material_card(style = 'height:800px',
+                                                                img(src=festival_info$festival_poster[this_festival], style = 'max-width:50%;float:right;max-height:750px;'),
+                                                                p(style = 'float:left;',
+                                                                  h2(a(paste0(str_glue('#{this_festival} '), gsub(' 2018| Festival| Music Festival', '', festival_info$festival_title[this_festival])), href = festival_info$festival_url[this_festival], target = '_blank')),
+                                                                  h4(festival_info$festival_location[this_festival]),
+                                                                  h4(festival_info$festival_dates[this_festival]), 
+                                                                  br(),
+                                                                  h3("Who you'll like"),
+                                                                  div(
+                                                                  map(1:10, function(this_artist) {
+                                                                      top_artist_df <- festival_top_artists %>% 
+                                                                          filter(festival_rank == this_festival) %>% 
+                                                                          slice(this_artist)
+                                                                      if (nrow(top_artist_df) > 0) {
+                                                                            div(style="max-width:150px; font-size:100%; text-align:center; display:inline-block",
+                                                                                img(src=top_artist_df$spotify_artist_img, alt="alternate text", style="padding-bottom:0.5em; max-width:150px;"),
+                                                                                top_artist_df$spotify_artist_name
                                                                             )
-                                                                        ),
-                                                                        br()
-                                                                    )
-                                                                })
+                                                                      } else {
+                                                                          HTML('&nbsp;')
+                                                                      }
+                                                                  })
+                                                                  )
+                                                                )
                                                             )
+                                                            
                                             )
                                         }
                                     })
