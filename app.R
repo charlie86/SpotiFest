@@ -91,6 +91,9 @@ ui <- material_page(
                                        a('Spotify', href = 'https://beta.developer.spotify.com/documentation/web-api/', target = '_blank'),
                                        ' pulled with ',
                                        a('spotifyr', href = 'https://www.github.com/charlie86/spotifyr', target = '_blank')
+                                     ),
+                                     p(style = 'text-align:left', 'See code on ',
+                                       a('GitHub', href = 'https://www.github.com/charlie86/SpotiFest', target = '_blank')
                                      )
                                  )
                  ),
@@ -185,15 +188,14 @@ server <- function(input, output, session) {
             ungroup
         
         if (nrow(festival_info) > 0) {
-            layout_matrix <- map(1:(num_festivals), function(x) x)
-            material_column(width = 12,
-                            map(1:length(layout_matrix), function(this_row) {
+            # material_column(width = 12,
+                            map(1:num_festivals, function(this_row) {
                                 material_row(
-                                    map(layout_matrix[[this_row]], function(this_festival) {
+                                    map(this_row, function(this_festival) {
                                         if (!is.na(festival_info$festival_title[this_festival])) {
                                             material_column(width = 12, align = 'center',
-                                                            material_card(style = 'height:800px',
-                                                                a(img(src=coalesce(festival_info$festival_poster[this_festival], festival_info$festival_img_big[this_festival]), style = 'max-width:50%;float:right;max-height:750px;'), href = festival_info$festival_url[this_festival], target = '_blank'),
+                                                            material_card(style = 'height:600px',
+                                                                a(img(src=coalesce(festival_info$festival_poster[this_festival], festival_info$festival_img_big[this_festival]), style = 'max-width:50%;float:right;max-height:550px;'), href = festival_info$festival_url[this_festival], target = '_blank'),
                                                                 p(style = 'float:left;',
                                                                   h2(a(paste0(str_glue('#{this_festival} '), gsub(' 2018| Festival| Music Festival', '', festival_info$festival_title[this_festival])), href = festival_info$festival_url[this_festival], target = '_blank')),
                                                                   h4(festival_info$festival_location[this_festival]),
@@ -224,7 +226,7 @@ server <- function(input, output, session) {
                                     })
                                 )
                             })
-            )
+            # )
         } else {
             h2("Sorry, we couldn't find any festivals for you with those options.", style = "color:white")
         }
