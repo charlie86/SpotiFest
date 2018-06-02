@@ -22,7 +22,7 @@ festival_details$country[festival_details$country == 'United Kingdom'] <- 'Unite
 festival_details$country[festival_details$country == 'South Korea'] <- 'Republic of Korea'
 festival_details$country[festival_details$country == 'Czechia'] <- 'Czech Republic'
 
-continent_lookup <- countrycode_data %>% 
+continent_lookup <- codelist %>% 
     select(continent, region, country.name.en) %>% 
     mutate(continent = case_when(
         continent == 'Oceania' ~ 'Australia',
@@ -168,7 +168,7 @@ server <- function(input, output, session) {
         festival_info <- lineup_affinities %>%
             filter(festival_start >= Sys.Date()) %>% 
             mutate(festival_url = ifelse(!is.na(festival_url), festival_url, festival_mfw_url),
-                   festival_location = ifelse(country == 'United States', str_glue('{festival_location}, USA'), festival_location)) %>% 
+                   festival_location = ifelse(country == 'United States of America', str_glue('{festival_location}, USA'), festival_location)) %>% 
             group_by(festival_title, festival_start, festival_location, festival_url, festival_dates, festival_img_big, festival_poster) %>%
             summarise(lineup_score = round(sum(score), 2)) %>%
             ungroup %>%
