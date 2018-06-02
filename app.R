@@ -197,10 +197,10 @@ server <- function(input, output, session) {
                                                             material_card(style = 'height:600px',
                                                                 a(img(src=coalesce(festival_info$festival_poster[this_festival], festival_info$festival_img_big[this_festival]), style = 'max-width:50%;float:right;max-height:550px;'), href = festival_info$festival_url[this_festival], target = '_blank'),
                                                                 p(style = 'float:left;',
-                                                                  h2(a(paste0(str_glue('#{this_festival} '), gsub(' 2018| Festival| Music Festival', '', festival_info$festival_title[this_festival])), href = festival_info$festival_url[this_festival], target = '_blank')),
-                                                                  h4(festival_info$festival_location[this_festival]),
-                                                                  h4(festival_info$festival_dates[this_festival]), 
-                                                                  h3("Who you'll like"),
+                                                                  h3(a(paste0(str_glue('#{this_festival} '), gsub(' 2018| Festival| Music Festival', '', festival_info$festival_title[this_festival])), href = festival_info$festival_url[this_festival], target = '_blank')),
+                                                                  h5(festival_info$festival_location[this_festival]),
+                                                                  h5(festival_info$festival_dates[this_festival]), 
+                                                                  h4("Who you'll like"),
                                                                   div(
                                                                   map(1:6, function(this_artist) {
                                                                       top_artist_df <- festival_top_artists %>% 
@@ -209,8 +209,8 @@ server <- function(input, output, session) {
                                                                       if (nrow(top_artist_df) > 0) {
                                                                           spotify_url <- str_glue('https://open.spotify.com/artist/{top_artist_df$spotify_artist_uri}')
                                                                           a(href = spotify_url, target = '_blank', style = 'color:black',
-                                                                            div(style="max-width:150px; font-size:100%; text-align:center; display:inline-block",
-                                                                                img(src=top_artist_df$spotify_artist_img, alt="alternate text", style="padding-bottom:0.5em; max-width:150px;"),
+                                                                            div(style="max-width:120px; font-size:100%; text-align:center; display:inline-block",
+                                                                                img(src=top_artist_df$spotify_artist_img, alt="alternate text", style="padding-bottom:0.5em; max-width:120px;"),
                                                                                 top_artist_df$spotify_artist_name
                                                                             )
                                                                             )
