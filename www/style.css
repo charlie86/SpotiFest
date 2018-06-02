@@ -25,7 +25,7 @@
 }
 
 html {
-	background-color: #828282;
+	background-color: white;
 }
 
 #uri_gif>img {
@@ -62,29 +62,4 @@ html {
 #DataTables_Table_1 > tbody > tr {
     background-color:transparent;
     font-size:18px;
-}
-
-.tooltip {
-    position: relative;
-    display: inline-block;
-    margin-left: 70px;
-}
-
-/* Tooltip text */
-.tooltip .tooltiptext {
-    visibility: hidden;
-    background-color: #2ebd59;
-    color: #fff;
-    text-align: center;
-    padding: 5px 0;
- 
-    /* Position the tooltip text - see examples below! */
-    
-    
-    z-index: 1;
-}
-
-/* Show the tooltip text when you mouse over the tooltip container */
-.tooltip:hover .tooltiptext {
-    visibility: visible;
 }
