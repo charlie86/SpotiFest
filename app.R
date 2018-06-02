@@ -17,8 +17,6 @@ load('festival_details.RData')
 load('festival_artists_spotify_2.RData')
 
 festival_details$country[is.na(festival_details$country)] <- 'NOT FOUND'
-festival_details$country[festival_details$country == 'United States'] <- 'United States of America'
-festival_details$country[festival_details$country == 'United Kingdom'] <- 'United Kingdom of Great Britain and Northern Ireland'
 festival_details$country[festival_details$country == 'South Korea'] <- 'Republic of Korea'
 festival_details$country[festival_details$country == 'Czechia'] <- 'Czech Republic'
 
