@@ -209,8 +209,8 @@ server <- function(input, output, session) {
                                                                       if (nrow(top_artist_df) > 0) {
                                                                           spotify_url <- str_glue('https://open.spotify.com/artist/{top_artist_df$spotify_artist_uri}')
                                                                           a(href = spotify_url, target = '_blank', style = 'color:black',
-                                                                            div(style="max-width:120px; font-size:100%; text-align:center; display:inline-block",
-                                                                                img(src=top_artist_df$spotify_artist_img, alt="alternate text", style="padding-bottom:0.5em; max-width:120px;"),
+                                                                            div(style="max-width:150px; font-size:100%; text-align:center; display:inline-block",
+                                                                                img(src=top_artist_df$spotify_artist_img, alt="alternate text", style="padding-bottom:0.5em; max-width:150px;"),
                                                                                 top_artist_df$spotify_artist_name
                                                                             )
                                                                             )
