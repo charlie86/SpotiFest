@@ -199,10 +199,9 @@ server <- function(input, output, session) {
                                                                   h2(a(paste0(str_glue('#{this_festival} '), gsub(' 2018| Festival| Music Festival', '', festival_info$festival_title[this_festival])), href = festival_info$festival_url[this_festival], target = '_blank')),
                                                                   h4(festival_info$festival_location[this_festival]),
                                                                   h4(festival_info$festival_dates[this_festival]), 
-                                                                  br(),
                                                                   h3("Who you'll like"),
                                                                   div(
-                                                                  map(1:10, function(this_artist) {
+                                                                  map(1:6, function(this_artist) {
                                                                       top_artist_df <- festival_top_artists %>% 
                                                                           filter(festival_rank == this_festival) %>% 
                                                                           slice(this_artist)
