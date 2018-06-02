@@ -38,13 +38,13 @@ html {
 }
 
 
-#shiny-material-dropdown-country_select > label, #shiny-material-dropdown-dates > label {
+#shiny-material-dropdown-region > label, #shiny-material-dropdown-dates > label {
     color:black;
     font-size: 20px;
     font-weight: bold;
 }
 
-#shiny-material-dropdown-country_select > div > input,
+#shiny-material-dropdown-region > div > input,
 #shiny-material-dropdown-dates > div > input{
     padding-top: 10px;
     font-size: 18px;

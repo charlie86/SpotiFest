@@ -15,6 +15,24 @@ rm(list = ls())
 load('festival_details.RData')
 load('festival_artists_spotify_2.RData')
 
+festival_details$country[is.na(festival_details$country)] <- 'NOT FOUND'
+festival_details$country[festival_details$country == 'United States'] <- 'United States of America'
+festival_details$country[festival_details$country == 'United Kingdom'] <- 'United Kingdom of Great Britain and Northern Ireland'
+festival_details$country[festival_details$country == 'South Korea'] <- 'Republic of Korea'
+festival_details$country[festival_details$country == 'Czechia'] <- 'Czech Republic'
+
+continent_lookup <- countrycode_data %>% 
+    select(continent, region, country.name.en) %>% 
+    mutate(continent = case_when(
+        continent == 'Oceania' ~ 'Australia',
+        region == 'South America' ~ 'South America',
+        region %in% c('Northern America', 'Central America', 'Caribbean') ~ 'North America',
+        TRUE ~ continent
+    ))
+
+festival_details <- festival_details %>% 
+    left_join(continent_lookup, by = c('country' = 'country.name.en'))
+
 festival_details <- filter(festival_details, festival_dates != 'Cancelled')
 
 if (interactive()) {
@@ -49,25 +67,28 @@ ui <- material_page(
     font_color = 'white',
     background_color = '#828282',
     title = HTML('<span>SpotiFest</span> <span style="font-size:12px"><a href="http://www.rcharlie.com" target="_blank">by RCharlie</a></span>'),
-    material_row(id = 'first_row',
-                 material_parallax('festival.jpg'),
-                 material_column(width = 8, align = 'center', offset = 2,
-                                 material_card(
-                                     h5('Find music festivals based on your top artists on Spotify', style = 'text-align:center;'),
-                                     actionButton('go', 'Find my festivals')
-                                 )
-                 )
-    ),
     tags$head(tags$link(rel = 'stylesheet', type = 'text/css', href = 'style.css')),
-    material_row(id = 'second_row',
+    material_row(
                  material_column(width = 3,
-                                 material_card(
-                                     material_dropdown('country_select', 'Where', c('Anywhere', sort(unique(festival_details$country))), color = 'black'),
-                                     material_dropdown('dates', 'When', c('Next 12 months' = as.character(Sys.Date() + years(1)), 'Next 6 months' = as.character(Sys.Date() + months(6))), color = 'black'),
-                                     p('Festival data from ',
+                                 material_card(align = 'center',
+                                               h4(style = 'text-align:left', 'Find music festivals based on your favorite music on Spotify'),
+                                               br(),
+                                     material_dropdown('region', 'Where', c('Anywhere', unique(festival_details$continent[!is.na(festival_details$continent)])), color = 'black'),
+                                     material_dropdown('dates', 'When', c('Next 12 months' = as.character(Sys.Date() + years(1)), 
+                                                                          'Next 6 months' = as.character(Sys.Date() + months(6)),
+                                                                          'Next 3 months' = as.character(Sys.Date() + months(3)),
+                                                                          'Next 30 days' = as.character(Sys.Date() + days(30))
+                                                                          ), color = 'black'),
+                                     div(id = 'login_button',
+                                        actionButton('go', 'Log in with Spotify'),
+                                        br(),
+                                        br()
+                                     ),
+                                    
+                                     p(style = 'text-align:left', 'Festival data from ',
                                        a('Music Festival Wizard', href = 'https://www.musicfestivalwizard.com', target = '_blank')
                                      ),
-                                     p('Artist data from ',
+                                     p(style = 'text-align:left', 'Artist data from ',
                                        a('Spotify', href = 'https://beta.developer.spotify.com/documentation/web-api/', target = '_blank'),
                                        ' pulled with ',
                                        a('spotifyr', href = 'https://www.github.com/charlie86/spotifyr', target = '_blank')
@@ -82,8 +103,6 @@ ui <- material_page(
 
 server <- function(input, output, session) {
     
-    hide('second_row')
-    
     get_access_token <- reactive({
         url_hash <- getUrlHash()
         access_token <- url_hash %>% str_replace('&.*', '') %>% str_replace('.*=', '')
@@ -94,7 +113,7 @@ server <- function(input, output, session) {
     })
     
     get_top_artists <- reactive({
-        res <<- GET('https://api.spotify.com/v1/me/top/artists/', 
+        res <- GET('https://api.spotify.com/v1/me/top/artists/', 
                    query = list(limit = 50), 
                    add_headers(.headers = c('Authorization' = paste0('Bearer ', get_access_token())))
         ) %>% content %>% .$items
@@ -107,26 +126,9 @@ server <- function(input, output, session) {
         })
     })
     
-    output$top_artists_table <- renderDataTable({
-        req(nrow(get_degrees()) > 0)
-        get_degrees() %>% 
-            filter(degree == 0) %>% 
-            transmute(Artist = artist_name, Score = score) %>% 
-            datatable(options = list(searching = F, scrollY = 250, scroller = T, info = F), extensions = 'Scroller', rownames = F)
-    })
-    
-    output$related_artists_table <- renderDataTable({
-        req(nrow(get_degrees()) > 0)
-        get_degrees() %>% 
-            filter(degree == 1) %>% 
-            transmute(Artist = artist_name, Score = score) %>% 
-            datatable(options = list(searching = F, scrollY = 250, scroller = T, info = F), extensions = 'Scroller', rownames = F)
-    })
-    
     get_degrees <- reactive({
         req(nrow(get_top_artists()) > 0)
-        hide('first_row')
-        show('second_row')
+        hide('login_button')
         future_map_dfr(1:nrow(get_top_artists()), function(i) {
             first_degree <- get_related_artists(artist_uri = get_top_artists()$artist_uri[i], use_artist_uri = TRUE) %>%
                 mutate(original_artist_name = get_top_artists()$artist_name[i],
@@ -152,8 +154,8 @@ server <- function(input, output, session) {
         
         festivals_filtered <- unique(festival_details)
         
-        if (input$country_select != 'Anywhere') {
-            festivals_filtered <- filter(festivals_filtered, country == input$country_select)
+        if (input$region != 'Anywhere') {
+            festivals_filtered <- filter(festivals_filtered, continent == input$region)
         }
         
         lineup_affinities <- festivals_filtered %>%
@@ -192,7 +194,7 @@ server <- function(input, output, session) {
                                         if (!is.na(festival_info$festival_title[this_festival])) {
                                             material_column(width = 12, align = 'center',
                                                             material_card(style = 'height:800px',
-                                                                a(img(src=festival_info$festival_poster[this_festival], style = 'max-width:50%;float:right;max-height:750px;'), href = festival_info$festival_url[this_festival], target = '_blank'),
+                                                                a(img(src=coalesce(festival_info$festival_poster[this_festival], festival_info$festival_img_big[this_festival]), style = 'max-width:50%;float:right;max-height:750px;'), href = festival_info$festival_url[this_festival], target = '_blank'),
                                                                 p(style = 'float:left;',
                                                                   h2(a(paste0(str_glue('#{this_festival} '), gsub(' 2018| Festival| Music Festival', '', festival_info$festival_title[this_festival])), href = festival_info$festival_url[this_festival], target = '_blank')),
                                                                   h4(festival_info$festival_location[this_festival]),
