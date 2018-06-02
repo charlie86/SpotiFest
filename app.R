@@ -68,38 +68,38 @@ ui <- material_page(
     title = HTML('<span>SpotiFest</span> <span style="font-size:12px"><a href="http://www.rcharlie.com" target="_blank">by RCharlie</a></span>'),
     tags$head(tags$link(rel = 'stylesheet', type = 'text/css', href = 'style.css')),
     material_row(
-                 material_column(width = 3,
-                                 material_card(align = 'center',
-                                               h4(style = 'text-align:left', 'Find music festivals based on your favorite music on Spotify'),
-                                               br(),
-                                     material_dropdown('region', 'Where', c('Anywhere', unique(festival_details$continent[!is.na(festival_details$continent)])), color = 'black'),
-                                     material_dropdown('dates', 'When', c('Next 12 months' = as.character(Sys.Date() + years(1)), 
-                                                                          'Next 6 months' = as.character(Sys.Date() + months(6)),
-                                                                          'Next 3 months' = as.character(Sys.Date() + months(3)),
-                                                                          'Next 30 days' = as.character(Sys.Date() + days(30))
-                                                                          ), color = 'black'),
-                                     div(id = 'login_button',
-                                        actionButton('go', 'Log in with Spotify'),
-                                        br(),
-                                        br()
-                                     ),
-                                    
-                                     p(style = 'text-align:left', 'Festival data from ',
-                                       a('Music Festival Wizard', href = 'https://www.musicfestivalwizard.com', target = '_blank')
-                                     ),
-                                     p(style = 'text-align:left', 'Artist data from ',
-                                       a('Spotify', href = 'https://beta.developer.spotify.com/documentation/web-api/', target = '_blank'),
-                                       ' pulled with ',
-                                       a('spotifyr', href = 'https://www.github.com/charlie86/spotifyr', target = '_blank')
-                                     ),
-                                     p(style = 'text-align:left', 'See code on ',
-                                       a('GitHub', href = 'https://www.github.com/charlie86/SpotiFest', target = '_blank')
-                                     )
-                                 )
-                 ),
-                 material_column(width = 9,
-                                 withSpinner(uiOutput('festivals_tbl'), color = '#1ED760', type = 7, proxy.height = '1000px', size = 2)
-                 )
+        material_column(width = 3,
+                        material_card(align = 'center', depth = 5,
+                                      h4(style = 'text-align:left', 'Find music festivals based on your favorite music on Spotify'),
+                                      br(),
+                                      material_dropdown('region', 'Where', c('Anywhere', unique(festival_details$continent[!is.na(festival_details$continent)])), color = 'black'),
+                                      material_dropdown('dates', 'When', c('Next 12 months' = as.character(Sys.Date() + years(1)), 
+                                                                           'Next 6 months' = as.character(Sys.Date() + months(6)),
+                                                                           'Next 3 months' = as.character(Sys.Date() + months(3)),
+                                                                           'Next 30 days' = as.character(Sys.Date() + days(30))
+                                      ), color = 'black'),
+                                      div(id = 'login_button',
+                                          actionButton('go', 'Log in with Spotify'),
+                                          br(),
+                                          br()
+                                      ),
+                                      
+                                      p(style = 'text-align:left', 'Festival data from ',
+                                        a('Music Festival Wizard', href = 'https://www.musicfestivalwizard.com', target = '_blank')
+                                      ),
+                                      p(style = 'text-align:left', 'Artist data from ',
+                                        a('Spotify', href = 'https://beta.developer.spotify.com/documentation/web-api/', target = '_blank'),
+                                        ' pulled with ',
+                                        a('spotifyr', href = 'https://www.github.com/charlie86/spotifyr', target = '_blank')
+                                      ),
+                                      p(style = 'text-align:left', 'See code on ',
+                                        a('GitHub', href = 'https://www.github.com/charlie86/SpotiFest', target = '_blank')
+                                      )
+                        )
+        ),
+        material_column(width = 9,
+                        withSpinner(uiOutput('festivals_tbl'), color = '#1ED760', type = 7, proxy.height = '1000px', size = 2)
+        )
     )
 )
 
@@ -189,43 +189,43 @@ server <- function(input, output, session) {
         
         if (nrow(festival_info) > 0) {
             # material_column(width = 12,
-                            map(1:num_festivals, function(this_row) {
-                                material_row(
-                                    map(this_row, function(this_festival) {
-                                        if (!is.na(festival_info$festival_title[this_festival])) {
-                                            material_column(width = 12, align = 'center',
-                                                            material_card(style = 'height:700px',
-                                                                a(img(src=coalesce(festival_info$festival_poster[this_festival], festival_info$festival_img_big[this_festival]), style = 'max-width:50%;float:right;max-height:600px;'), href = festival_info$festival_url[this_festival], target = '_blank'),
-                                                                p(style = 'float:left;',
-                                                                  h3(a(paste0(str_glue('#{this_festival} '), gsub(' 2018| Festival| Music Festival', '', festival_info$festival_title[this_festival])), href = festival_info$festival_url[this_festival], target = '_blank')),
-                                                                  h5(festival_info$festival_location[this_festival]),
-                                                                  h5(festival_info$festival_dates[this_festival]), 
-                                                                  h4("Who you'll like"),
-                                                                  div(
-                                                                  map(1:8, function(this_artist) {
-                                                                      top_artist_df <- festival_top_artists %>% 
-                                                                          filter(festival_rank == this_festival) %>% 
-                                                                          slice(this_artist)
-                                                                      if (nrow(top_artist_df) > 0) {
-                                                                          spotify_url <- str_glue('https://open.spotify.com/artist/{top_artist_df$spotify_artist_uri}')
-                                                                          a(href = spotify_url, target = '_blank', style = 'color:black',
-                                                                            div(style="max-width:150px; font-size:100%; text-align:center; display:inline-block",
-                                                                                img(src=top_artist_df$spotify_artist_img, alt="alternate text", style="padding-bottom:0.5em; max-width:150px;"),
-                                                                                top_artist_df$spotify_artist_name
-                                                                            )
-                                                                            )
-                                                                      } else {
-                                                                          HTML('&nbsp;')
-                                                                      }
-                                                                  })
-                                                                  )
-                                                                )
+            map(1:num_festivals, function(this_row) {
+                material_row(
+                    map(this_row, function(this_festival) {
+                        if (!is.na(festival_info$festival_title[this_festival])) {
+                            material_column(width = 12, align = 'center',
+                                            material_card(style = 'height:700px', depth = 5,
+                                                          a(img(src=coalesce(festival_info$festival_poster[this_festival], festival_info$festival_img_big[this_festival]), style = 'max-width:50%;float:right;max-height:600px;'), href = festival_info$festival_url[this_festival], target = '_blank'),
+                                                          p(style = 'float:left;',
+                                                            h3(a(paste0(str_glue('#{this_festival} '), gsub(' 2018| Festival| Music Festival', '', festival_info$festival_title[this_festival])), href = festival_info$festival_url[this_festival], target = '_blank')),
+                                                            h5(festival_info$festival_location[this_festival]),
+                                                            h5(festival_info$festival_dates[this_festival]), 
+                                                            h4("Who you'll like"),
+                                                            div(
+                                                                map(1:8, function(this_artist) {
+                                                                    top_artist_df <- festival_top_artists %>% 
+                                                                        filter(festival_rank == this_festival) %>% 
+                                                                        slice(this_artist)
+                                                                    if (nrow(top_artist_df) > 0) {
+                                                                        spotify_url <- str_glue('https://open.spotify.com/artist/{top_artist_df$spotify_artist_uri}')
+                                                                        a(href = spotify_url, target = '_blank', style = 'color:black',
+                                                                          div(style="max-width:150px; font-size:100%; text-align:center; display:inline-block",
+                                                                              img(src=top_artist_df$spotify_artist_img, alt="alternate text", style="padding-bottom:0.5em; max-width:150px;"),
+                                                                              top_artist_df$spotify_artist_name
+                                                                          )
+                                                                        )
+                                                                    } else {
+                                                                        HTML('&nbsp;')
+                                                                    }
+                                                                })
                                                             )
+                                                          )
                                             )
-                                        }
-                                    })
-                                )
-                            })
+                            )
+                        }
+                    })
+                )
+            })
             # )
         } else {
             h2("Sorry, we couldn't find any festivals for you with those options.", style = "color:white")
