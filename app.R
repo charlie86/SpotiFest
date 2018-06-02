@@ -15,7 +15,6 @@ rm(list = ls())
 load('festival_details.RData')
 load('festival_artists_spotify_2.RData')
 
-# festivals <- filter(festivals, festival_start >= Sys.Date())
 festival_details <- filter(festival_details, festival_dates != 'Cancelled')
 
 if (interactive()) {
@@ -55,7 +54,7 @@ ui <- material_page(
                  material_column(width = 8, align = 'center', offset = 2,
                                  material_card(
                                      h5('Find music festivals based on your top artists on Spotify', style = 'text-align:center;'),
-                                     actionButton('go', 'Log in with Spotify')
+                                     actionButton('go', 'Find my festivals')
                                  )
                  )
     ),
@@ -95,7 +94,7 @@ server <- function(input, output, session) {
     })
     
     get_top_artists <- reactive({
-        res <- GET('https://api.spotify.com/v1/me/top/artists/', 
+        res <<- GET('https://api.spotify.com/v1/me/top/artists/', 
                    query = list(limit = 50), 
                    add_headers(.headers = c('Authorization' = paste0('Bearer ', get_access_token())))
         ) %>% content %>% .$items
@@ -176,8 +175,8 @@ server <- function(input, output, session) {
         festival_top_artists <- festival_info %>% 
             mutate(festival_rank = row_number()) %>% 
             left_join(lineup_affinities, by = 'festival_title') %>% 
-            select(festival_title, festival_rank, spotify_artist_name, spotify_artist_img, degree, rank, score) %>% 
-            group_by(festival_title, festival_rank, spotify_artist_name, spotify_artist_img) %>% 
+            select(festival_title, festival_rank, spotify_artist_name, spotify_artist_img, spotify_artist_uri, degree, rank, score) %>% 
+            group_by(festival_title, festival_rank, spotify_artist_name, spotify_artist_img, spotify_artist_uri) %>% 
             summarise(score = sum(score)) %>% 
             ungroup %>% 
             group_by(festival_title, festival_rank) %>% 
@@ -192,9 +191,8 @@ server <- function(input, output, session) {
                                     map(layout_matrix[[this_row]], function(this_festival) {
                                         if (!is.na(festival_info$festival_title[this_festival])) {
                                             material_column(width = 12, align = 'center',
-                                                            
                                                             material_card(style = 'height:800px',
-                                                                img(src=festival_info$festival_poster[this_festival], style = 'max-width:50%;float:right;max-height:750px;'),
+                                                                a(img(src=festival_info$festival_poster[this_festival], style = 'max-width:50%;float:right;max-height:750px;'), href = festival_info$festival_url[this_festival], target = '_blank'),
                                                                 p(style = 'float:left;',
                                                                   h2(a(paste0(str_glue('#{this_festival} '), gsub(' 2018| Festival| Music Festival', '', festival_info$festival_title[this_festival])), href = festival_info$festival_url[this_festival], target = '_blank')),
                                                                   h4(festival_info$festival_location[this_festival]),
@@ -206,9 +204,12 @@ server <- function(input, output, session) {
                                                                           filter(festival_rank == this_festival) %>% 
                                                                           slice(this_artist)
                                                                       if (nrow(top_artist_df) > 0) {
+                                                                          spotify_url <- str_glue('https://open.spotify.com/artist/{top_artist_df$spotify_artist_uri}')
+                                                                          a(href = spotify_url, target = '_blank', style = 'color:black',
                                                                             div(style="max-width:150px; font-size:100%; text-align:center; display:inline-block",
                                                                                 img(src=top_artist_df$spotify_artist_img, alt="alternate text", style="padding-bottom:0.5em; max-width:150px;"),
                                                                                 top_artist_df$spotify_artist_name
+                                                                            )
                                                                             )
                                                                       } else {
                                                                           HTML('&nbsp;')
@@ -217,7 +218,6 @@ server <- function(input, output, session) {
                                                                   )
                                                                 )
                                                             )
-                                                            
                                             )
                                         }
                                     })
