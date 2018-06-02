@@ -194,15 +194,15 @@ server <- function(input, output, session) {
                                     map(this_row, function(this_festival) {
                                         if (!is.na(festival_info$festival_title[this_festival])) {
                                             material_column(width = 12, align = 'center',
-                                                            material_card(style = 'height:600px',
-                                                                a(img(src=coalesce(festival_info$festival_poster[this_festival], festival_info$festival_img_big[this_festival]), style = 'max-width:50%;float:right;max-height:550px;'), href = festival_info$festival_url[this_festival], target = '_blank'),
+                                                            material_card(style = 'height:700px',
+                                                                a(img(src=coalesce(festival_info$festival_poster[this_festival], festival_info$festival_img_big[this_festival]), style = 'max-width:50%;float:right;max-height:600px;'), href = festival_info$festival_url[this_festival], target = '_blank'),
                                                                 p(style = 'float:left;',
                                                                   h3(a(paste0(str_glue('#{this_festival} '), gsub(' 2018| Festival| Music Festival', '', festival_info$festival_title[this_festival])), href = festival_info$festival_url[this_festival], target = '_blank')),
                                                                   h5(festival_info$festival_location[this_festival]),
                                                                   h5(festival_info$festival_dates[this_festival]), 
                                                                   h4("Who you'll like"),
                                                                   div(
-                                                                  map(1:6, function(this_artist) {
+                                                                  map(1:8, function(this_artist) {
                                                                       top_artist_df <- festival_top_artists %>% 
                                                                           filter(festival_rank == this_festival) %>% 
                                                                           slice(this_artist)
