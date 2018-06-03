@@ -70,7 +70,7 @@ ui <- material_page(
     material_row(
         material_column(width = 3,
                         material_card(align = 'center', depth = 5,
-                                      h4(style = 'text-align:left', 'Find music festivals based on your favorite music on Spotify'),
+                                      h4(style = 'text-align:left', 'Find music festivals based on your favorite Spotify tunes'),
                                       br(),
                                       material_dropdown('region', 'Where', c('Anywhere', unique(festival_details$continent[!is.na(festival_details$continent)])), color = 'black'),
                                       material_dropdown('dates', 'When', c('Next 12 months' = as.character(Sys.Date() + years(1)), 
@@ -201,7 +201,7 @@ server <- function(input, output, session) {
                                                               h3(a(paste0(str_glue('#{this_festival} '), gsub(' 2018| Festival| Music Festival', '', festival_info$festival_title[this_festival])), href = festival_info$festival_url[this_festival], target = '_blank')),
                                                               h5(festival_info$festival_location[this_festival]),
                                                               h5(festival_info$festival_dates[this_festival]), 
-                                                              h4("Who you'll like"),
+                                                              h4("We think you'll like..."),
                                                               map(1:8, function(this_artist) {
                                                                   top_artist_df <- festival_top_artists %>% 
                                                                       filter(festival_rank == this_festival) %>% 
@@ -218,7 +218,6 @@ server <- function(input, output, session) {
                                                                       HTML('&nbsp;')
                                                                   }
                                                               })
-                                                              
                                                           )
                                             )
                             )
