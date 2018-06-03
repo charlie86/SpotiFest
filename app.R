@@ -66,7 +66,9 @@ ui <- material_page(
     font_color = 'white',
     background_color = '#828282',
     title = HTML('<span>SpotiFest</span> <span style="font-size:12px"><a href="http://www.rcharlie.com" target="_blank">by RCharlie</a></span>'),
-    tags$head(tags$link(rel = 'stylesheet', type = 'text/css', href = 'style.css')),
+    tags$head(tags$link(rel = 'stylesheet', type = 'text/css', href = 'style.css'),
+              includeScript('www/ga.js'),
+              includeScript('www/hotjar.js')),
     material_row(
         material_column(width = 3,
                         material_card(align = 'center', depth = 5,
