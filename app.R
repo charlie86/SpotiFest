@@ -45,10 +45,10 @@ if (interactive()) {
 
 auth_url <- GET('https://accounts.spotify.com/authorize',
                 query = list(
-                    client_id = Sys.getenv('SPOTIFY_CLIENT_ID'),
+                    client_id = Sys.getenv('SPOTIFEST_CLIENT_ID'),
                     response_type = 'token',
                     redirect_uri = REDIRECT_URI,
-                    scope = 'user-read-email user-top-read'
+                    scope = 'user-top-read'
                 )) %>% .$url
 
 login_js <- paste0("shinyjs.login = function(callback) {
