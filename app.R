@@ -73,30 +73,29 @@ ui <- material_page(
         material_column(width = 3,
                         material_card(align = 'center', depth = 5,
                                       h4(style = 'text-align:left', 'Find music festivals based on your favorite Spotify tunes'),
-                                      br(),
-                                      material_dropdown('region', 'Where', c('Anywhere', unique(festival_details$continent[!is.na(festival_details$continent)])), color = 'black'),
-                                      material_dropdown('dates', 'When', c('Next 12 months' = as.character(Sys.Date() + years(1)), 
-                                                                           'Next 6 months' = as.character(Sys.Date() + months(6)),
-                                                                           'Next 3 months' = as.character(Sys.Date() + months(3)),
-                                                                           'Next 30 days' = as.character(Sys.Date() + days(30))
-                                      ), color = 'black'),
-                                      div(id = 'login_button',
-                                          actionButton('go', 'Log in with Spotify'),
+                                      div(id = 'inputs',
                                           br(),
-                                          br()
-                                      ),
-                                      
-                                      p(style = 'text-align:left', 'Festival data from ',
-                                        a('Music Festival Wizard', href = 'https://www.musicfestivalwizard.com', target = '_blank')
-                                      ),
-                                      p(style = 'text-align:left', 'Artist data from ',
-                                        a('Spotify', href = 'https://beta.developer.spotify.com/documentation/web-api/', target = '_blank'),
-                                        ' pulled with ',
-                                        a('spotifyr', href = 'https://www.github.com/charlie86/spotifyr', target = '_blank')
-                                      ),
-                                      p(style = 'text-align:left', 'See code on ',
-                                        a('GitHub', href = 'https://www.github.com/charlie86/SpotiFest', target = '_blank')
+                                          material_dropdown('region', 'Where', c('Anywhere', unique(festival_details$continent[!is.na(festival_details$continent)])), color = 'black'),
+                                          material_dropdown('dates', 'When', c('Next 12 months' = as.character(Sys.Date() + years(1)), 
+                                                                               'Next 6 months' = as.character(Sys.Date() + months(6)),
+                                                                               'Next 3 months' = as.character(Sys.Date() + months(3)),
+                                                                               'Next 30 days' = as.character(Sys.Date() + days(30))
+                                          ), color = 'black'),
+                                          p(style = 'text-align:left', 'Festival data from ',
+                                            a('Music Festival Wizard', href = 'https://www.musicfestivalwizard.com', target = '_blank')
+                                          ),
+                                          p(style = 'text-align:left', 'Artist data from ',
+                                            a('Spotify', href = 'https://beta.developer.spotify.com/documentation/web-api/', target = '_blank'),
+                                            ' pulled with ',
+                                            a('spotifyr', href = 'https://www.github.com/charlie86/spotifyr', target = '_blank')
+                                          ),
+                                          p(style = 'text-align:left', 'See code on ',
+                                            a('GitHub', href = 'https://www.github.com/charlie86/SpotiFest', target = '_blank')
+                                          )
                                       )
+                        ),
+                        material_card(id = 'login_button', depth = 5, align = 'center',
+                                      actionButton('go', 'Log in with Spotify')
                         )
         ),
         material_column(width = 9,
@@ -106,6 +105,8 @@ ui <- material_page(
 )
 
 server <- function(input, output, session) {
+    
+    hide('inputs')
     
     get_access_token <- reactive({
         url_hash <- getUrlHash()
@@ -133,6 +134,7 @@ server <- function(input, output, session) {
     get_degrees <- reactive({
         req(nrow(get_top_artists()) > 0)
         hide('login_button')
+        show('inputs')
         future_map_dfr(1:nrow(get_top_artists()), function(i) {
             first_degree <- get_related_artists(artist_uri = get_top_artists()$artist_uri[i], use_artist_uri = TRUE) %>%
                 mutate(original_artist_name = get_top_artists()$artist_name[i],
@@ -150,7 +152,7 @@ server <- function(input, output, session) {
                 TRUE ~ 0
             ), 2))
     })
-        
+    
     output$festivals_tbl <- renderUI({
         
         req(nrow(get_degrees()) > 0)
