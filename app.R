@@ -51,13 +51,21 @@ auth_url <- GET('https://accounts.spotify.com/authorize',
                     scope = 'user-top-read'
                 )) %>% .$url
 
-login_js <- paste0("shinyjs.login = function(callback) {
-                 var url = '", auth_url, "';
-                 var parseResult = new DOMParser().parseFromString(url, 'text/html');
-                 var parsedUrl = parseResult.documentElement.textContent;
-                 window.location = parsedUrl;
-        };"
+# login_js <- paste0("shinyjs.login = function(callback) {
+#                  var url = '", auth_url, "';
+#                  var parseResult = new DOMParser().parseFromString(url, 'text/html');
+#                  var parsedUrl = parseResult.documentElement.textContent;
+#                  window.location = parsedUrl;
+#         };"
+# )
+login_js <- str_glue("shinyjs.login = function(callback) {
+                    var url = '{{auth_url}}';
+                     var parseResult = new DOMParser().parseFromString(url, 'text/html');
+                     var parsedUrl = parseResult.documentElement.textContent;
+                     window.location = parsedUrl;
+                     };", .open = '{{', .close = '}}'
 )
+
 
 ui <- material_page(
     useShinyjs(),
@@ -199,7 +207,7 @@ server <- function(input, output, session) {
                             material_column(width = 12, align = 'center',
                                             material_card(style = 'height:700px', depth = 5,
                                                           div(style = 'width:50%;float:right',
-                                                              a(img(src=coalesce(festival_info$festival_poster[this_festival], festival_info$festival_img_big[this_festival]), style = 'max-height:600px;max-width:100%;'), href = festival_info$festival_url[this_festival], target = '_blank')
+                                                              a(img(class = 'lineup-image', src=coalesce(festival_info$festival_poster[this_festival], festival_info$festival_img_big[this_festival]), style = 'max-height:600px;max-width:100%;'), href = festival_info$festival_url[this_festival], target = '_blank')
                                                           ),
                                                           div(style = 'float:left;width:50%;',
                                                               h3(a(paste0(str_glue('#{this_festival} '), gsub(' 2018| Festival| Music Festival', '', festival_info$festival_title[this_festival])), href = festival_info$festival_url[this_festival], target = '_blank')),
@@ -212,8 +220,8 @@ server <- function(input, output, session) {
                                                                       slice(this_artist)
                                                                   if (nrow(top_artist_df) > 0) {
                                                                       spotify_url <- str_glue('https://open.spotify.com/artist/{top_artist_df$spotify_artist_uri}')
-                                                                      a(href = spotify_url, target = '_blank', style = 'color:black',
-                                                                        div(style="max-width:125px; font-size:100%; text-align:center; display:inline-block",
+                                                                      a(class = 'artist-card-text', href = spotify_url, target = '_blank', style = 'color:black',
+                                                                        div(class = 'artist-card', style="max-width:125px; font-size:100%; text-align:center; display:inline-block",
                                                                             img(src=top_artist_df$spotify_artist_img, alt="alternate text", style="padding-bottom:0.5em; max-width:125px;"),
                                                                             top_artist_df$spotify_artist_name
                                                                         )

@@ -16,6 +16,19 @@
 	color: black;
 }
 
+.artist-card-text:hover {
+    text-decoration: none;
+}
+
+.artist-card:hover, .lineup-image:hover {
+  box-shadow: 0 0 20px rgba(0,0,0,0.8); 
+  z-index: 10;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
 html {
 	background-color: #828282;
 }
