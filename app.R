@@ -14,7 +14,7 @@ plan(multiprocess)
 rm(list = ls())
 
 load('festival_details.RData')
-load('festival_artists_spotify_2.RData')
+load('festival_artists_spotify.RData')
 
 festival_details$country[is.na(festival_details$country)] <- 'NOT FOUND'
 festival_details$country[festival_details$country == 'South Korea'] <- 'Republic of Korea'
@@ -144,7 +144,7 @@ server <- function(input, output, session) {
         hide('login_button')
         show('inputs')
         future_map_dfr(1:nrow(get_top_artists()), function(i) {
-            first_degree <- get_related_artists(artist_uri = get_top_artists()$artist_uri[i], use_artist_uri = TRUE) %>%
+            first_degree <- get_related_artists(get_top_artists()$artist_uri[i]) %>%
                 mutate(original_artist_name = get_top_artists()$artist_name[i],
                        degree = 1) %>%
                 select(artist_name, artist_uri, degree) %>%
