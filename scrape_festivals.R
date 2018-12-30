@@ -1,19 +1,19 @@
 library(glue)
-library(furrr)
 library(httr)
+library(furrr)
 library(rvest)
-library(stringr)
 library(ggmap)
-library(tidyverse)
+library(stringr)
 library(spotifyr)
+library(tidyverse)
 
 base_url <- 'https://www.musicfestivalwizard.com/all-festivals/'
 
 # Find number of pages to search through ----------------------------------
 num_festivals <- read_html(base_url) %>%
-    html_node('.festival-count') %>%
+    html_node('.search-res') %>%
     html_text %>%
-    str_extract('[[:digit:]]{1,} festivals') %>%
+    str_extract('returned [[:digit:]]{1,} results') %>%
     parse_number
 
 num_pages <- ceiling(num_festivals / 15)
@@ -23,39 +23,48 @@ date_pulled <- Sys.time()
 plan(multiprocess)
 # Loop through pages and scrape festival details and links ----------------
 festivals <- future_map_dfr(1:num_pages, function(this_page) {
-    # this_page <- 1
     
-    # pb <- txtProgressBar(min = 1, max = num_pages, style = 3)
+    festival_list <- read_html(paste0(base_url, 'page/', this_page)) %>%
+        html_nodes('.lineup-item')
     
-    festival_list <- read_html(glue('{base_url}page/{this_page}')) %>%
-        html_nodes('.singlefestlisting')
-    
-    festivals_df <- future_map_dfr(1:length(festival_list), function(this_festival) {
-        # this_festival <- 4
+    future_map_dfr(1:length(festival_list), function(this_festival) {
         
-        festival_image <- festival_list[[this_festival]] %>%
-            html_node('.festivalright') %>%
-            html_node('img') %>%
-            as.character %>%
-            str_extract('https://.*\\.(png|jpg)')
+        festival_image <- festival_list[[this_festival]] %>% 
+            html_node('img') %>% 
+            html_attr('src')
         
-        left_node <- festival_list[[this_festival]] %>%
-            html_node('.festivalleft')
+        festival_header <- festival_list[[this_festival]] %>% 
+            html_node('.search-title')
+        
+        festival_title <- festival_header %>% 
+            html_node('h2') %>% 
+            html_text()
+        
+        festival_mfw_url <- festival_header %>% 
+            html_node('h2>a') %>% 
+            html_attr('href')
+        
+        festival_meta_text <- festival_header %>% 
+            html_node('.search-meta') %>% 
+            html_text() %>% 
+            str_split('\n') %>% 
+            unlist()
+        
+        festival_location <- str_trim(festival_meta_text[2])
+        festival_dates <- str_replace_all(festival_meta_text[3], '/.*', '') %>% str_trim()
         
         list(
-            festival_start = html_node(left_node, '.festivalstart') %>% html_text %>% as.Date('%b %d %Y'),
-            festival_title = html_node(left_node, '.festivaltitle') %>% html_text,
-            festival_mfw_url = html_node(left_node, '.festivaltitle') %>% html_node('a') %>% str_extract(., '(?<=").*?(?=")'),
-            festival_location = html_node(left_node, '.festivallocation') %>% html_text,
-            festival_dates = html_node(left_node, '.festivaldate') %>% html_text,
+            festival_title = festival_title,
+            festival_dates = festival_dates,
+            festival_location = festival_location,
             festival_image = festival_image,
+            festival_mfw_url = festival_mfw_url,
             date_pulled = date_pulled
         )
         
-    }, .progress = T)
+    }, .progress = TRUE)
     
-    return(festivals_df)
-}, .progress = T)
+}, .progress = TRUE)
 
 # Loop through festival pages to scrape lineups ---------------------------
 festival_artists <- future_map_dfr(1:nrow(festivals), function(this_festival) {
@@ -63,33 +72,31 @@ festival_artists <- future_map_dfr(1:nrow(festivals), function(this_festival) {
     festival_html <- read_html(festivals$festival_mfw_url[this_festival])
     
     artists <- festival_html %>%
-        html_nodes('.lineupguide>ul>li') %>%
-        html_text
+        html_node('.hublineup') %>%
+        html_nodes('li') %>% 
+        html_text()
     
-    festival_url <- festival_html %>%
-        html_nodes('#festival-basics>a') %>%
-        str_extract('http://.*/\\" ') %>%
-        str_replace('" ', '')
+    festival_urls <- festival_html %>%
+        html_node('.websitebuttonfree') %>%
+        html_nodes('a') %>% 
+        map_df(function(x) list(title = html_text(x), url = html_attr(x, 'href')))
     
     festival_poster <- festival_html %>%
-        html_node('#festival-poster>img') %>%
-        str_extract('https://.*\\.png')
+        html_node('.article-poster>a>img') %>%
+        html_attr('src')
     
-    artist_info <- tibble(
+    test = tibble(
         artist_name = artists,
         festival_name = festivals$festival_title[this_festival],
-        festival_url = festival_url,
+        festival_urls = list(festival_urls),
         festival_poster = festival_poster
     )
     
-    return(artist_info)
-    
-}, .progress = T)
+}, .progress = TRUE)
 
 locations <- unique(festivals$festival_location)
 
-# pb <- txtProgressBar(min = 0, max = length(locations), style = 3)
-locations_geo <- future_map_dfr(locations, function(location) {
+locations_geo <- future_map_dfr(locations[1:10], function(location) {
     tries <- 0
     while (tries < 5) {
         geo_info <- geocode(location, output = 'more')
@@ -111,19 +118,16 @@ locations_geo <- future_map_dfr(locations, function(location) {
         country <- geo_info$country
     }
     
-    df <- tibble(
+    tibble(
         festival_location = location,
         lon = lon,
         lat = lat,
         country = country
     )
-    # setTxtProgressBar(pb, match(location, locations))
-    return(df)
-}, .progress = T)
+}, .progress = TRUE)
 
 festivals <- left_join(festivals, locations_geo, by = 'festival_location')
 save(festivals, file = 'festivals.RData')
-
 
 # Get artist discography audio features with spotifyr ----------------------
 unique_artists <- unique(festival_artists$artist_name)
@@ -132,7 +136,7 @@ pb <- txtProgressBar(min = 1, max = length(unique_artists), style = 3)
 spotify_artist_names <- map_df(unique_artists, function(artist) {
     
     tryCatch({
-        spotify_artist <- get_artists(artist)
+        spotify_artist <- search_spotify(artist, type = 'artist')
     }, error = function(e) {
         spotify_artist <- tibble()
     })
@@ -142,7 +146,7 @@ spotify_artist_names <- map_df(unique_artists, function(artist) {
         if (nrow(spotify_artist) > 0) {
             
             exact_matches <- spotify_artist %>% 
-                filter(artist_name == artist)
+                filter(name == artist)
             
             if (nrow(exact_matches) == 0) {
                 closest_artist <- slice(spotify_artist, 1)
@@ -150,11 +154,11 @@ spotify_artist_names <- map_df(unique_artists, function(artist) {
                 closest_artist <- slice(exact_matches, 1)
             }
             df <- closest_artist %>% 
-                mutate(festival_artist_name = artist) %>% 
+                mutate(festival_artist_name = artist,
+                       spotify_artist_img = ifelse(is.null(images[[1]]$url[1]), NA, images[[1]]$url[1])) %>% 
                 select(festival_artist_name,
-                       spotify_artist_name = artist_name,
-                       spotify_artist_uri = artist_uri, 
-                       spotify_artist_img = artist_img)
+                       spotify_artist_name = name,
+                       spotify_artist_id = id)
         } else {
             df <- tibble()
         }
