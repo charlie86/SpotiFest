@@ -6,15 +6,16 @@ library(ggmap)
 library(stringr)
 library(spotifyr)
 library(tidyverse)
+library(countrycode)
 
 base_url <- 'https://www.musicfestivalwizard.com/all-festivals/'
 
 # Find number of pages to search through ----------------------------------
-num_festivals <- read_html(base_url) %>%
-    html_node('.search-res') %>%
-    html_text %>%
-    str_extract('returned [[:digit:]]{1,} results') %>%
-    parse_number
+num_festivals <- read_html(base_url) %>% 
+    html_node('.search-res') %>% 
+    html_text() %>% 
+    str_extract('returned [[:digit:]]{1,} results') %>% 
+    parse_number()
 
 num_pages <- ceiling(num_festivals / 15)
 
@@ -85,7 +86,7 @@ festival_artists <- future_map_dfr(1:nrow(festivals), function(this_festival) {
         html_node('.article-poster>a>img') %>%
         html_attr('src')
     
-    test = tibble(
+    tibble(
         artist_name = artists,
         festival_name = festivals$festival_title[this_festival],
         festival_urls = list(festival_urls),
@@ -96,57 +97,106 @@ festival_artists <- future_map_dfr(1:nrow(festivals), function(this_festival) {
 
 locations <- unique(festivals$festival_location)
 
-locations_geo <- future_map_dfr(locations[1:10], function(location) {
-    tries <- 0
-    while (tries < 5) {
-        geo_info <- geocode(location, output = 'more')
-        if (is.na(geo_info$lat) & is.na(geo_info$lon)) {
-            tries <- tries + 1
-            Sys.sleep(tries * 2)
-        } else {
-            break
+classify_location <- function(location) {
+    if (is.na(location)) {
+        return(NA)
+    }
+    last_four <- str_sub(location, start = nchar(location) - 3, end = nchar(location))
+    if (str_detect(last_four, ', [[:upper:]]{2}')) {
+        last_two <- str_sub(last_four, start = 3, end = 4)
+        if (last_two == 'UK') {
+            return('UK')
+        } else if (last_two %in% state.abb) {
+            return('United States')
         }
     }
     
-    if (is.null(geo_info$country)) {
-        lon <- NA
-        lat <- NA
-        country <- NA
-    } else {
-        lon <- geo_info$lon
-        lat <- geo_info$lat
-        country <- geo_info$country
+    text_after_comma <- str_replace_all(location, '.*, ', '')
+    
+    if (text_after_comma %in% unique(codelist_panel$country.name.en)) {
+        return(text_after_comma)
     }
     
-    tibble(
-        festival_location = location,
-        lon = lon,
-        lat = lat,
-        country = country
-    )
-}, .progress = TRUE)
+    if (text_after_comma %in% state.name) {
+        return('United States')
+    }
+    
+    if (text_after_comma %in% c('BC', 'QC', 'QB', 'AB', 'ON', 'NB', 'PE', 'MB', 'Alberta', 'Victoria')) {
+        return('Canada')
+    }
+    
+    if (str_detect(location, 'Australia')) {
+        return('Australia')
+    }
+    
+    if (str_detect(text_after_comma, 'México')) {
+        return('Mexico')
+    }
+    
+    if (str_detect(text_after_comma, 'Netherlands') | location == 'Amsterdam/Eindhoven/Rotterdam') {
+        return('Netherlands')
+    }
+    
+    if (text_after_comma == 'Korea') {
+        return('South Korea')
+    }
+    
+    if (location == 'Florence, Itlay' | text_after_comma == 'Sicily') {
+        return('Italy')
+    }
+    
+    if (location == 'Buckinghamshire UK' | text_after_comma %in% c('Scotland', 'Wales', 'Kent')) {
+        return('UK')
+    }
+    
+    if (text_after_comma == 'Latvija') {
+        return('Latvia')
+    }
+    
+    if (text_after_comma %in% c('Czech', 'Czech Republic')) {
+        return('Czech Republic')
+    }
+    
+    if (text_after_comma == 'SA') {
+        return('South Africa')
+    }
+    
+    if (location == 'Palma/Corsica/Ibiza') {
+        return('Spain')
+    }
+    
+    if (location == 'Saint Martin') {
+        return('Saint Martin')
+    }
+    
+    if (location == 'Santa Marta, Columbia') {
+        return('Colombia')
+    }
+    
+    return(NA)
+}
+
+locations_geo <- festivals %>% 
+    mutate(location = map(festival_location, classify_location) %>% as.character) %>% 
+    select(location, festival_location)
 
 festivals <- left_join(festivals, locations_geo, by = 'festival_location')
 save(festivals, file = 'festivals.RData')
 
 # Get artist discography audio features with spotifyr ----------------------
-unique_artists <- unique(festival_artists$artist_name)
+unique_artists <- unique(festival_artists$artist_name[!festival_artists$artist_name == ''])
 
 pb <- txtProgressBar(min = 1, max = length(unique_artists), style = 3)
 spotify_artist_names <- map_df(unique_artists, function(artist) {
     
-    tryCatch({
-        spotify_artist <- search_spotify(artist, type = 'artist')
-    }, error = function(e) {
-        spotify_artist <- tibble()
-    })
+    spotify_artist <- get_artists(artist)
     
     if (exists('spotify_artist')) {
         
         if (nrow(spotify_artist) > 0) {
             
             exact_matches <- spotify_artist %>% 
-                filter(name == artist)
+                filter(artist_name == artist)
             
             if (nrow(exact_matches) == 0) {
                 closest_artist <- slice(spotify_artist, 1)
@@ -155,10 +205,11 @@ spotify_artist_names <- map_df(unique_artists, function(artist) {
             }
             df <- closest_artist %>% 
                 mutate(festival_artist_name = artist,
-                       spotify_artist_img = ifelse(is.null(images[[1]]$url[1]), NA, images[[1]]$url[1])) %>% 
+                       spotify_artist_img = artist_img) %>% 
                 select(festival_artist_name,
-                       spotify_artist_name = name,
-                       spotify_artist_id = id)
+                       spotify_artist_img,
+                       spotify_artist_name = artist_name,
+                       spotify_artist_id = artist_uri)
         } else {
             df <- tibble()
         }
@@ -170,8 +221,8 @@ spotify_artist_names <- map_df(unique_artists, function(artist) {
 })
 
 spotify_artist_names <- spotify_artist_names %>% 
-    mutate_at(c('spotify_artist_name', 'spotify_artist_uri', 'spotify_artist_img'), funs(ifelse(festival_artist_name != 'Fuglar' & spotify_artist_name == 'Fuglar', NA, .))) %>% 
-    filter(!is.na(spotify_artist_uri))
+    mutate_at(c('spotify_artist_name', 'spotify_artist_id'), funs(ifelse(festival_artist_name != 'Fuglar' & spotify_artist_name == 'Fuglar', NA, .))) %>% 
+    filter(!is.na(spotify_artist_id))
 
 spotify_artist_names_exact_matches <- filter(spotify_artist_names, tolower(festival_artist_name) == tolower(spotify_artist_name))
 

@@ -1,20 +1,44 @@
-library(spotifyr)
-library(tidyverse)
-library(shinymaterial)
-library(lubridate)
+library(DT)
 library(httr)
 library(shiny)
-library(shinycssloaders)
-library(countrycode)
-library(DT)
-library(shinyjs)
 library(furrr)
+library(shinyjs)
+library(spotifyr)
+library(lubridate)
+library(tidyverse)
+library(countrycode)
+library(shinymaterial)
+library(shinycssloaders)
+
 plan(multiprocess)
 
 rm(list = ls())
 
-load('festival_details.RData')
+load('festivals.RData')
 load('festival_artists_spotify.RData')
+festivals <- unique(festivals)
+
+festival_urls <- festival_artists_spotify %>% 
+    select(festival_name, festival_urls) %>% 
+    unique()
+festival_urls <- map_df(1:nrow(festival_urls), function(festival) {
+    this_festival <- slice(festival_urls, festival) %>% 
+        pull(festival_urls) %>%
+        .[[1]] %>% 
+        mutate(festival_name = festival_urls$festival_name[festival])
+})
+official_festival_urls <- festival_urls %>% 
+    filter(title == 'OFFICIAL WEBSITE') %>% 
+    select(festival_title = festival_name, festival_url = url)
+
+festival_details <- festivals %>% 
+    left_join(official_festival_urls, by = 'festival_title') %>% 
+    mutate(country = location,
+           festival_year = str_extract(festival_dates, '[[:digit:]]{4}$'),
+           festival_start = str_replace_all(festival_dates, '-.*|–.*', ''),
+           festival_start = str_replace_all(festival_start, ',.*', ''),
+           festival_start = as.Date(paste(festival_start, festival_year), '%B %d %Y')) %>% 
+    select(-festival_year)
 
 festival_details$country[is.na(festival_details$country)] <- 'NOT FOUND'
 festival_details$country[festival_details$country == 'South Korea'] <- 'Republic of Korea'
@@ -174,15 +198,15 @@ server <- function(input, output, session) {
         
         lineup_affinities <- festivals_filtered %>%
             unique %>% 
-            filter(festival_start <= input$dates) %>% 
-            left_join(select(festival_artists_spotify, -c(artist_name, festival_url, festival_poster)), by = c('festival_title' = 'festival_name')) %>% 
-            inner_join(get_degrees(), by = c('spotify_artist_uri' = 'artist_uri'))
+            filter(festival_start <= input$dates) %>%
+            left_join(select(festival_artists_spotify, -c(artist_name)), by = c('festival_title' = 'festival_name')) %>% 
+            inner_join(get_degrees(), by = c('spotify_artist_id' = 'artist_uri'))
         
         festival_info <- lineup_affinities %>%
-            filter(festival_start >= Sys.Date()) %>% 
+            filter(festival_start >= Sys.Date()) %>%
             mutate(festival_url = ifelse(!is.na(festival_url), festival_url, festival_mfw_url),
                    festival_location = ifelse(country == 'United States of America', str_glue('{festival_location}, USA'), festival_location)) %>% 
-            group_by(festival_title, festival_start, festival_location, festival_url, festival_dates, festival_img_big, festival_poster) %>%
+            group_by(festival_title, festival_location, festival_url, festival_dates, festival_image, festival_poster) %>%
             summarise(lineup_score = round(sum(score), 2)) %>%
             ungroup %>%
             arrange(-lineup_score) %>%
@@ -191,8 +215,8 @@ server <- function(input, output, session) {
         festival_top_artists <- festival_info %>% 
             mutate(festival_rank = row_number()) %>% 
             left_join(lineup_affinities, by = 'festival_title') %>% 
-            select(festival_title, festival_rank, spotify_artist_name, spotify_artist_img, spotify_artist_uri, degree, rank, score) %>% 
-            group_by(festival_title, festival_rank, spotify_artist_name, spotify_artist_img, spotify_artist_uri) %>% 
+            select(festival_title, festival_rank, spotify_artist_name, spotify_artist_img, spotify_artist_id, degree, rank, score) %>% 
+            group_by(festival_title, festival_rank, spotify_artist_name, spotify_artist_img, spotify_artist_id) %>% 
             summarise(score = sum(score)) %>% 
             ungroup %>% 
             group_by(festival_title, festival_rank) %>% 
@@ -219,7 +243,7 @@ server <- function(input, output, session) {
                                                                       filter(festival_rank == this_festival) %>% 
                                                                       slice(this_artist)
                                                                   if (nrow(top_artist_df) > 0) {
-                                                                      spotify_url <- str_glue('https://open.spotify.com/artist/{top_artist_df$spotify_artist_uri}')
+                                                                      spotify_url <- str_glue('https://open.spotify.com/artist/{top_artist_df$spotify_artist_id}')
                                                                       a(class = 'artist-card-text', href = spotify_url, target = '_blank', style = 'color:black',
                                                                         div(class = 'artist-card', style="max-width:125px; font-size:100%; text-align:center; display:inline-block",
                                                                             img(src=top_artist_df$spotify_artist_img, alt="alternate text", style="padding-bottom:0.5em; max-width:125px;"),
