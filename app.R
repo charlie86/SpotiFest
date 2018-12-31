@@ -166,7 +166,7 @@ server <- function(input, output, session) {
     get_degrees <- reactive({
         req(nrow(get_top_artists()) > 0)
         hide('login_button')
-        show('inputs')
+        shinyjs::show('inputs')
         future_map_dfr(1:nrow(get_top_artists()), function(i) {
             first_degree <- get_related_artists(get_top_artists()$artist_uri[i]) %>%
                 mutate(original_artist_name = get_top_artists()$artist_name[i],
