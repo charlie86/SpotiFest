@@ -151,7 +151,7 @@ server <- function(input, output, session) {
     
     get_top_artists <- reactive({
         res <- GET('https://api.spotify.com/v1/me/top/artists/', 
-                   query = list(limit = 50), 
+                   query = list(limit = 50),
                    add_headers(.headers = c('Authorization' = paste0('Bearer ', get_access_token())))
         ) %>% content %>% .$items
         
@@ -167,14 +167,21 @@ server <- function(input, output, session) {
         req(nrow(get_top_artists()) > 0)
         hide('login_button')
         shinyjs::show('inputs')
-        future_map_dfr(1:nrow(get_top_artists()), function(i) {
-            first_degree <- get_related_artists(get_top_artists()$artist_uri[i]) %>%
-                mutate(original_artist_name = get_top_artists()$artist_name[i],
-                       degree = 1) %>%
-                select(artist_name, artist_uri, degree) %>%
-                rbind(tibble(artist_name = get_top_artists()$artist_name[i], artist_uri = get_top_artists()$artist_uri[i], degree = 0)) %>%
-                mutate(rank = i)
-        }) %>% group_by(artist_name, artist_uri) %>%
+        map_df(1:nrow(get_top_artists()), function(i) {
+            related_artists <- get_related_artists(get_top_artists()$artist_uri[i])
+            if (nrow(related_artists) > 0) {
+                first_degree <- related_artists %>% 
+                    mutate(original_artist_name = get_top_artists()$artist_name[i],
+                           degree = 1) %>%
+                    select(artist_name, artist_uri, degree) %>%
+                    rbind(tibble(artist_name = get_top_artists()$artist_name[i], artist_uri = get_top_artists()$artist_uri[i], degree = 0)) %>%
+                    mutate(rank = i)
+            } else {
+                first_degree <- tibble()
+            }
+            return(first_degree)
+        }) %>% 
+            group_by(artist_name, artist_uri) %>%
             unique %>%
             arrange(degree, rank) %>% 
             ungroup %>% 
