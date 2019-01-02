@@ -167,7 +167,7 @@ server <- function(input, output, session) {
         req(nrow(get_top_artists()) > 0)
         hide('login_button')
         shinyjs::show('inputs')
-        map_df(1:nrow(get_top_artists()), function(i) {
+        future_map_dfr(1:nrow(get_top_artists()), function(i) {
             related_artists <- get_related_artists(get_top_artists()$artist_uri[i])
             if (nrow(related_artists) > 0) {
                 first_degree <- related_artists %>% 
