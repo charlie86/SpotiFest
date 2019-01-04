@@ -150,17 +150,20 @@ server <- function(input, output, session) {
     })
     
     get_top_artists <- reactive({
-        res <- GET('https://api.spotify.com/v1/me/top/artists/', 
-                   query = list(limit = 50),
-                   add_headers(.headers = c('Authorization' = paste0('Bearer ', get_access_token())))
-        ) %>% content %>% .$items
-        
-        map_df(res, function(x) {
-            list(
-                artist_name = x$name,
-                artist_uri = x$id
-            )
-        })
+        map_df(paste0(c('short', 'medium', 'long'), '_term'), function(time_range) {
+            res <- GET('https://api.spotify.com/v1/me/top/artists/', 
+                       query = list(limit = 50,
+                                    time_range = time_range),
+                       add_headers(.headers = c('Authorization' = paste0('Bearer ', get_access_token())))
+            ) %>% content %>% .$items
+            
+            map_df(res, function(x) {
+                list(
+                    artist_name = x$name,
+                    artist_uri = x$id
+                )
+            })
+        }) %>% unique()
     })
     
     get_degrees <- reactive({
