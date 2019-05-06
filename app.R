@@ -164,6 +164,7 @@ server <- function(input, output, session) {
                 )
             })
         }) %>% unique()
+        
     })
     
     get_degrees <- reactive({
@@ -176,7 +177,7 @@ server <- function(input, output, session) {
                 first_degree <- related_artists %>% 
                     mutate(original_artist_name = get_top_artists()$artist_name[i],
                            degree = 1) %>%
-                    select(artist_name, artist_uri, degree) %>%
+                    select(artist_name = name, artist_uri = id, degree) %>%
                     rbind(tibble(artist_name = get_top_artists()$artist_name[i], artist_uri = get_top_artists()$artist_uri[i], degree = 0)) %>%
                     mutate(rank = i)
             } else {

@@ -14,7 +14,7 @@ base_url <- 'https://www.musicfestivalwizard.com/all-festivals/'
 num_festivals <- read_html(base_url) %>% 
     html_node('.search-res') %>% 
     html_text() %>% 
-    str_extract('returned [[:digit:]]{1,} results') %>% 
+    str_extract('returned [[:digit:]]{1,} festivals') %>% 
     parse_number()
 
 num_pages <- ceiling(num_festivals / 15)
@@ -25,10 +25,14 @@ plan(multiprocess)
 # Loop through pages and scrape festival details and links ----------------
 festivals <- future_map_dfr(1:num_pages, function(this_page) {
     
+    # this_page <- 1
+    
     festival_list <- read_html(paste0(base_url, 'page/', this_page)) %>%
         html_nodes('.lineup-item')
     
     future_map_dfr(1:length(festival_list), function(this_festival) {
+        
+        # this_festival <- 1
         
         festival_image <- festival_list[[this_festival]] %>% 
             html_node('img') %>% 
@@ -78,7 +82,7 @@ festival_artists <- future_map_dfr(1:nrow(festivals), function(this_festival) {
         html_text()
     
     festival_urls <- festival_html %>%
-        html_node('.websitebuttonfree') %>%
+        html_node('.hubwebsite') %>%
         html_nodes('a') %>% 
         map_df(function(x) list(title = html_text(x), url = html_attr(x, 'href')))
     
@@ -186,17 +190,19 @@ save(festivals, file = 'festivals.RData')
 # Get artist discography audio features with spotifyr ----------------------
 unique_artists <- unique(festival_artists$artist_name[!festival_artists$artist_name == ''])
 
-pb <- txtProgressBar(min = 1, max = length(unique_artists), style = 3)
-spotify_artist_names <- map_df(unique_artists, function(artist) {
-    
-    spotify_artist <- get_artists(artist)
+# pb <- txtProgressBar(min = 1, max = length(unique_artists), style = 3)
+
+spotify_artist_names <- future_map_dfr(unique_artists, function(artist) {
+    artist_name_lower <- tolower(artist)
+
+    spotify_artist <- search_spotify(artist_name_lower, 'artist')
     
     if (exists('spotify_artist')) {
         
         if (nrow(spotify_artist) > 0) {
             
             exact_matches <- spotify_artist %>% 
-                filter(artist_name == artist)
+                filter(tolower(name) == artist_name_lower)
             
             if (nrow(exact_matches) == 0) {
                 closest_artist <- slice(spotify_artist, 1)
@@ -205,11 +211,11 @@ spotify_artist_names <- map_df(unique_artists, function(artist) {
             }
             df <- closest_artist %>% 
                 mutate(festival_artist_name = artist,
-                       spotify_artist_img = artist_img) %>% 
+                       spotify_artist_img = ifelse(is.null(images[[1]]$url[1]), NA, images[[1]]$url[1])) %>% 
                 select(festival_artist_name,
                        spotify_artist_img,
-                       spotify_artist_name = artist_name,
-                       spotify_artist_id = artist_uri)
+                       spotify_artist_name = name,
+                       spotify_artist_id = id)
         } else {
             df <- tibble()
         }
@@ -218,10 +224,9 @@ spotify_artist_names <- map_df(unique_artists, function(artist) {
     }
     setTxtProgressBar(pb, match(artist, unique_artists))
     return(df)
-})
+}, .progress = TRUE)
 
 spotify_artist_names <- spotify_artist_names %>% 
-    mutate_at(c('spotify_artist_name', 'spotify_artist_id'), funs(ifelse(festival_artist_name != 'Fuglar' & spotify_artist_name == 'Fuglar', NA, .))) %>% 
     filter(!is.na(spotify_artist_id))
 
 spotify_artist_names_exact_matches <- filter(spotify_artist_names, tolower(festival_artist_name) == tolower(spotify_artist_name))
