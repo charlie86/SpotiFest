@@ -22,6 +22,7 @@ num_pages <- ceiling(num_festivals / 15)
 date_pulled <- Sys.time()
 
 plan(multiprocess)
+
 # Loop through pages and scrape festival details and links ----------------
 festivals <- future_map_dfr(1:num_pages, function(this_page) {
     
@@ -36,7 +37,7 @@ festivals <- future_map_dfr(1:num_pages, function(this_page) {
         
         festival_image <- festival_list[[this_festival]] %>% 
             html_node('img') %>% 
-            html_attr('src')
+            html_attr('data-lazy-src')
         
         festival_header <- festival_list[[this_festival]] %>% 
             html_node('.search-title')
@@ -50,13 +51,15 @@ festivals <- future_map_dfr(1:num_pages, function(this_page) {
             html_attr('href')
         
         festival_meta_text <- festival_header %>% 
-            html_node('.search-meta') %>% 
-            html_text() %>% 
-            str_split('\n') %>% 
-            unlist()
+            html_nodes('.search-meta') %>% 
+            html_text(trim = TRUE) %>% 
+            str_remove_all(' / Book Tickets') %>% 
+            str_remove_all('  ') %>% 
+            str_replace_all('\n', ' ') %>% 
+            str_trim()
         
-        festival_location <- str_trim(festival_meta_text[2])
-        festival_dates <- str_replace_all(festival_meta_text[3], '/.*', '') %>% str_trim()
+        festival_dates <- str_extract(festival_meta_text, paste0(' (', paste0(month.name, collapse = '|'), ') ', '.*$')) %>% str_trim()
+        festival_location <- str_remove(festival_meta_text, festival_dates) %>% str_trim()
         
         list(
             festival_title = festival_title,
@@ -74,6 +77,8 @@ festivals <- future_map_dfr(1:num_pages, function(this_page) {
 # Loop through festival pages to scrape lineups ---------------------------
 festival_artists <- future_map_dfr(1:nrow(festivals), function(this_festival) {
     
+    # this_festival <- 1
+    
     festival_html <- read_html(festivals$festival_mfw_url[this_festival])
     
     artists <- festival_html %>%
@@ -88,7 +93,7 @@ festival_artists <- future_map_dfr(1:nrow(festivals), function(this_festival) {
     
     festival_poster <- festival_html %>%
         html_node('.article-poster>a>img') %>%
-        html_attr('src')
+        html_attr('data-lazy-src')
     
     tibble(
         artist_name = artists,
@@ -125,7 +130,7 @@ classify_location <- function(location) {
         return('United States')
     }
     
-    if (text_after_comma %in% c('BC', 'QC', 'QB', 'AB', 'ON', 'NB', 'PE', 'MB', 'Alberta', 'Victoria')) {
+    if (text_after_comma %in% c('BC', 'QC', 'QB', 'AB', 'ON', 'NB', 'PE', 'MB', 'SK', 'Alberta', 'Victoria', 'Nova Scotia')) {
         return('Canada')
     }
     
@@ -169,6 +174,26 @@ classify_location <- function(location) {
         return('Spain')
     }
     
+    if (location == 'Texas Tour') {
+        return('United States')
+    }
+    
+    if (text_after_comma == 'TN/VA') {
+        return('United States')
+    }
+    
+    if (text_after_comma == 'Northern Ireland') {
+        return('Northern Ireland')
+    }
+    
+    if (location == 'Bethel NY') {
+        return('United States')
+    }
+    
+    if (location == 'Italy/Croatia/Montenegro') {
+        return('Italy')
+    }
+    
     if (location == 'Saint Martin') {
         return('Saint Martin')
     }
@@ -190,11 +215,9 @@ save(festivals, file = 'festivals.RData')
 # Get artist discography audio features with spotifyr ----------------------
 unique_artists <- unique(festival_artists$artist_name[!festival_artists$artist_name == ''])
 
-# pb <- txtProgressBar(min = 1, max = length(unique_artists), style = 3)
-
 spotify_artist_names <- future_map_dfr(unique_artists, function(artist) {
     artist_name_lower <- tolower(artist)
-
+    
     spotify_artist <- search_spotify(artist_name_lower, 'artist')
     
     if (exists('spotify_artist')) {
@@ -222,7 +245,6 @@ spotify_artist_names <- future_map_dfr(unique_artists, function(artist) {
     } else {
         df <- tibble()
     }
-    setTxtProgressBar(pb, match(artist, unique_artists))
     return(df)
 }, .progress = TRUE)
 
